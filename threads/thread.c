@@ -11,6 +11,8 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+
+
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -28,7 +30,15 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
-/* Idle thread. */
+/*TBD sunny: addd BLOCKED LIST and init it*/
+static struct list sleep_list;
+/*TBD DONE*/
+
+/*TBD chobae: 모든 thread를 관리하는 list*/
+static struct list all_list;
+/*TBD DONE*/
+
+/* Idle thread. */                       
 static struct thread *idle_thread;
 
 /* Initial thread, the thread running init.c:main(). */
@@ -39,6 +49,10 @@ static struct lock tid_lock;
 
 /* Thread destruction requests */
 static struct list destruction_req;
+
+/*TBD: sunny 전역변수 선언, sleep list대기중인 녀석들 중 wake_tick최소값*/
+static int64_t next_tick_to_awake;
+/*TBD done*/
 
 /* Statistics. */
 static long long idle_ticks;    /* # of timer ticks spent idle. */
@@ -92,7 +106,9 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
    It is not safe to call thread_current() until this function
    finishes. */
-void
+/* oh~yes global variable*/
+
+void 
 thread_init (void) {
 	ASSERT (intr_get_level () == INTR_OFF);
 
@@ -109,6 +125,9 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+	/*TBD sunny: init sleep_list*/
+	list_init (&sleep_list);
+	/*TBD sunny done*/
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -217,6 +236,7 @@ thread_create (const char *name, int priority,
    is usually a better idea to use one of the synchronization
    primitives in synch.h. */
 void
+
 thread_block (void) {
 	ASSERT (!intr_context ());
 	ASSERT (intr_get_level () == INTR_OFF);
@@ -588,3 +608,54 @@ allocate_tid (void) {
 
 	return tid;
 }
+
+void thread_sleep(int64_t ticks){
+ /* 현재 스레드가 idle 스레드가 아닐경우 (식당이 꽉 찼을 때) thread의 상태를 BLOCKED로 바꾸고 깨어나야 할 ticks을 저장한다.
+ -  thread_block함수 호출 (-> 현재 스레드가 THREAD_BLOCK 으로 바뀜)
+ -  현재 스레드를 슬립 큐에 삽입한 후에 스케줄한다. 
+ -  awake함수가 실행되어야 할 tick값을 update
+ - 해당 과정중에는 인터럽트를 받아들이지 않는다. 
+ - 함수가 다 실행되면 인터럽트를 받아들인다.
+ */
+	enum intr_level old_level =intr_disable (); // Disables interrupts and returns the previous interrupt status.
+ 	struct thread *curr = thread_current ();  //   얘를 블락시키기 -> 깨어나야할 시간(tick)을 저장
+
+	ASSERT(curr != idle_thread);
+	update_next_tick_to_awake(curr->wakeup_tick = ticks);    
+	list_push_back(&sleep_list, &curr->elem);
+	// thread_block();
+	do_schedule(THREAD_BLOCKED);
+  	intr_set_level(old_level);                 // 기존 인터럽트 레벨을 복구(원래 disabled였을 수도 있어서)
+
+}
+
+/*TBD sunny: wakeup_tick값이 ticks보다 작거나 같은 쓰레드를 깨움
+ *현재 대기중인 스레드들의 wakeup_tick변수 중 가장 작은 값을 next_tick_to_awake변수에 저장*/
+void thread_awake(int64_t wakeup_tick){
+  next_tick_to_awake = INT64_MAX;
+  struct list_elem *e;
+  e = list_begin(&sleep_list);
+  while(e != list_end(&sleep_list)){
+    struct thread * t = list_entry(e, struct thread, elem);
+
+    if(wakeup_tick >= t->wakeup_tick){
+      e = list_remove(&t->elem);
+      thread_unblock(t);
+    }else{
+      e = list_next(e);
+      update_next_tick_to_awake(t->wakeup_tick);
+    }
+  }
+}
+
+
+void update_next_tick_to_awake(int64_t ticks){
+	if (next_tick_to_awake > ticks)
+		next_tick_to_awake = ticks;
+}
+
+int64_t get_next_tick_to_awake(void){
+	return next_tick_to_awake;
+}
+/*TBD sunny done*/
+

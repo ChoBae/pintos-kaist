@@ -75,7 +75,7 @@ int64_t
 timer_ticks (void) {
 	enum intr_level old_level = intr_disable ();
 	int64_t t = ticks;
-	intr_set_level (old_level);
+	intr_set_level (old_level);  
 	barrier ();
 	return t;
 }
@@ -92,9 +92,11 @@ void
 timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
-	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+	// ASSERT (intr_get_level () == INTR_ON);
+	// while (timer_elapsed (start) < ticks)
+	// 	thread_yield ();
+
+	thread_sleep(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -120,13 +122,21 @@ void
 timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
+/* 매 틱마다 호출되는 인터럽트 핸들러.  CPU에 내장된 타이머가 자동으로 이 인터럽트를 일으켜준다. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
-	ticks++;
+	ticks++;			// 매 ticks마다 호출되므로 전역 ticks를 올려준다.
 	thread_tick ();
+	/*TBD sunny: 매 틱마다 thread_awake 를 소환*/
+	if (get_next_tick_to_awake() <= ticks ){
+		// 만약 다음에 깨어나야하는 ticks가 전역 ticks보다 작다면, 일어날 시간이 된 스레드가 아마도 있을 확률이 있다!
+		thread_awake(ticks);   // 깨우러 가자
+	}
+	/*TBD done*/
 }
+
 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */

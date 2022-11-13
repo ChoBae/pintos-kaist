@@ -90,10 +90,15 @@ struct thread {
 	tid_t tid;                          /* Thread identifier. */
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
+	uint8_t *stack; 					/* TBD sunny: Saved stack pointer. */
 	int priority;                       /* Priority. */
-
+	struct list_elem allelem;/*TBD sunny: added*/
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	
+	/*TBD sunny: awake할 tick 추가 (변수명_wakeup_tick)*/ 
+	int64_t wakeup_tick;
+	/*TBD done*/
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -142,5 +147,12 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 void do_iret (struct intr_frame *tf);
+
+/*TBD chobae: 추가된 함수*/
+void thread_sleep(int64_t ticks); 	// 실행 중인 스레드를 슬립으로 만듦
+void thread_awake(int64_t ticks);	// 슬립큐에서 깨워야할 스레드를 깨움
+void update_next_tick_to_awake(int64_t ticks);	// 최소 틱을 가진 스레드 저장
+int64_t get_next_tick_to_awake(void);	// thread.c의 next_tick_to_awake 반환
+/*TBD DONE*/
 
 #endif /* threads/thread.h */
