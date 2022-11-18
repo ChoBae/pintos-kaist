@@ -154,7 +154,7 @@ sema_test_helper (void *sema_) {
 		sema_up (&sema[1]);
 	}
 }
-
+
 /* Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to
@@ -186,24 +186,25 @@ lock_init (struct lock *lock) {
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
+
+/* 현재 실행중인 thread가 lock을 요청하는 함수(+lock 얻을수도..?) */
 void
 lock_acquire (struct lock *lock) {
+	
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
-	/* TODO :
-	   해당 lock의 holder가 존재한다면 아래 작업을 수행한다.
-	   현재 스레드의 wait_on_lock 변수에 획득 하기를 기다리는 lock의 주소를 저장
-	   priority donation 수행하기 위해 donate_priority() 함수 호출
 
-	   *multiple donation을 고려하기 위해 이전 상태의 우선순위를 기억,
-	   donation을 받은 스레드의 thread 구조체를 List로 관리한다.
-	*/
-
-	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
-
-	/* TODO : lock을 획득 한 후 lock holder를 갱신한다. */
+	if (lock->holder){
+		thread_current()->wait_on_lock = lock;
+		// TBD: multiple 코드 구현
+		list_insert_ordered(&(lock->holder->donations), &(thread_current()->donation_elem), cmp_delem_priority, NULL);
+		donate_priority();
+	}
+	
+	sema_down (&lock->semaphore);  //TBD: why sema_down earlier??
+	thread_current()->wait_on_lock = NULL; //OYES added
+	lock->holder = thread_current();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -231,13 +232,19 @@ lock_try_acquire (struct lock *lock) {
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
+
+/* 점유되고 있는 자원을 놓아주면 끝! */
 void
 lock_release (struct lock *lock) {
+
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
 
 	lock->holder = NULL;
-	/*TODO : remove_with_lock() , refresh_priority 추가*/
+	// if( !list_empty(& (thread_current()->donations))) //TBD: 최적화
+
+	remove_with_lock(lock); 	
+	refresh_priority();			
 	sema_up (&lock->semaphore);
 }
 
@@ -250,7 +257,7 @@ lock_held_by_current_thread (const struct lock *lock) {
 
 	return lock->holder == thread_current ();
 }
-
+
 /* One semaphore in a list. */
 struct semaphore_elem {
 	struct list_elem elem;              /* List element. */
