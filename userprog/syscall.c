@@ -7,12 +7,13 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include <debug.h>
+#include <string.h>
 
 // TBD chobae : project2 api add
 #include <filesys/filesys.h>
 #include <init.h>
 #include <process.h>
-#include <syscall.h>
 #include <file.h>
 
 void syscall_entry (void);
@@ -66,11 +67,10 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// SYS_SEEK,                   /* Change position in a file. */
 	// SYS_TELL,                   /* Report current position in a file. */
 	// SYS_CLOSE,                  /* Close a file. */
-	switch (f->vec_no)
+	switch (f->R.rax)
 	{
 	// 0 -> HALT() :
-	case 0:
-		printf("this syscall %s \n", SYS_HALT);
+	case SYS_HALT:
 		halt();
 		break;
 	case 1:
@@ -81,9 +81,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		printf("this syscall %s \n", SYS_FORK);
 		fork();
 		break;
-	case 3:
-		printf("this syscall %s \n", SYS_EXEC);
-		exec();
+	case SYS_EXEC:
+		exec(f->R.rdi);
 		break;
 	case 4:
 		printf("this syscall %s \n", SYS_WAIT);
@@ -103,37 +102,31 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	case 8:
 		printf("this syscall %s \n", SYS_FILESIZE);
-		filesys_init();
+		filesize();
 		break;
 	case 9:
 		printf("this syscall %s \n", SYS_READ);
 		read();
 		break;
-	// case 0:
-	// 	printf("this syscall %s \n", is SYS_HALT);
-	// 	halt();
-	// 	/* code */
-	// 	break;
-	// case 0:
-	// 	printf("this syscall %s \n", is SYS_HALT);
-	// 	halt();
-	// 	/* code */
-	// 	break;
-	// case 0:
-	// 	printf("this syscall %s \n", is SYS_HALT);
-	// 	halt();
-	// 	/* code */
-	// 	break;
-	// case 0:
-	// 	printf("this syscall %s \n", is SYS_HALT);
-	// 	halt();
-	// 	/* code */
-	// 	break;
-	// case 0:
-	// 	printf("this syscall %s \n", is SYS_HALT);
-	// 	halt();
-	// 	/* code */
-	// 	break;
+	case 10:
+		printf("this syscall %s \n", SYS_WRITE);
+		halt();
+		/* code */
+		break;
+	case 11:
+		printf("this syscall %s \n", SYS_SEEK);
+		halt();
+		/* code */
+		break;
+	case 12:
+		printf("this syscall %s \n", SYS_TELL);
+		halt();
+		/* code */
+		break;
+	case 13:
+		printf("this syscall %s \n", SYS_CLOSE);
+		close();
+		break;
 	
 	default:
 		break;
@@ -148,12 +141,10 @@ void check_address(void *addr)	{
 		잘못된 접근일 경우 프로세스 종료
 		유효한 주소 (0x8048000 ~ 0x0000000)인지 확인
 	*/
-}
+	if (is_kernel_vaddr(addr)) {
+		process_exit();
+	}
 
-void get_argument(void *rsp, int *arg, int count) {
-	/* 유저 스택에 저장된 인자값들을 커널로 저장
-	   인자가 저장된 위치가 유저영역인지 확인
-	*/
 }
 
 // syscall func section
@@ -168,6 +159,7 @@ void exit(int status) {
 	struct thread *cur = thread_current();
 	printf("%s : exit", cur->tid);
 	thread_exit();
+	process_exit();
 }
 // fork() ->  💩💩왕중요💩💩
 // pid_t fork (const char *thread_name) {
