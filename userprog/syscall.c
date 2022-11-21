@@ -8,6 +8,13 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 
+// TBD chobae : project2 api add
+#include <filesys/filesys.h>
+#include <init.h>
+#include <process.h>
+#include <syscall.h>
+#include <file.h>
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
@@ -41,6 +48,177 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
+	// 유저 스택에 저장되어 있는 시스템 콜 넘버를 이용해 시스템 콜 핸들러 구현
+	// 스택 포인터가 유저 영역인지 확인
+	check_address(f->rsp);
 	printf ("system call!\n");
+	// SYS_HALT,                   /* Halt the operating system. */
+	// SYS_EXIT,                   /* Terminate this process. */
+	// SYS_FORK,                   /* Clone current process. */
+	// SYS_EXEC,                   /* Switch current process. */
+	// SYS_WAIT,                   /* Wait for a child process to die. */
+	// SYS_CREATE,                 /* Create a file. */
+	// SYS_REMOVE,                 /* Delete a file. */
+	// SYS_OPEN,                   /* Open a file. */
+	// SYS_FILESIZE,               /* Obtain a file's size. */
+	// SYS_READ,                   /* Read from a file. */
+	// SYS_WRITE,                  /* Write to a file. */
+	// SYS_SEEK,                   /* Change position in a file. */
+	// SYS_TELL,                   /* Report current position in a file. */
+	// SYS_CLOSE,                  /* Close a file. */
+	switch (f->vec_no)
+	{
+	// 0 -> HALT() :
+	case 0:
+		printf("this syscall %s \n", SYS_HALT);
+		halt();
+		break;
+	case 1:
+		printf("this syscall %s \n", SYS_EXIT);
+		exit();
+		break;
+	case 2:
+		printf("this syscall %s \n", SYS_FORK);
+		fork();
+		break;
+	case 3:
+		printf("this syscall %s \n", SYS_EXEC);
+		exec();
+		break;
+	case 4:
+		printf("this syscall %s \n", SYS_WAIT);
+		wait();
+		break;
+	case 5:
+		printf("this syscall %s \n", SYS_CREATE);
+		create();
+		break;
+	case 6:
+		printf("this syscall %s \n", SYS_REMOVE);
+		remove();
+		break;
+	case 7:
+		printf("this syscall %s \n", SYS_OPEN);
+		open();
+		break;
+	case 8:
+		printf("this syscall %s \n", SYS_FILESIZE);
+		filesys_init();
+		break;
+	case 9:
+		printf("this syscall %s \n", SYS_READ);
+		read();
+		break;
+	// case 0:
+	// 	printf("this syscall %s \n", is SYS_HALT);
+	// 	halt();
+	// 	/* code */
+	// 	break;
+	// case 0:
+	// 	printf("this syscall %s \n", is SYS_HALT);
+	// 	halt();
+	// 	/* code */
+	// 	break;
+	// case 0:
+	// 	printf("this syscall %s \n", is SYS_HALT);
+	// 	halt();
+	// 	/* code */
+	// 	break;
+	// case 0:
+	// 	printf("this syscall %s \n", is SYS_HALT);
+	// 	halt();
+	// 	/* code */
+	// 	break;
+	// case 0:
+	// 	printf("this syscall %s \n", is SYS_HALT);
+	// 	halt();
+	// 	/* code */
+	// 	break;
+	
+	default:
+		break;
+	}
 	thread_exit ();
 }
+
+
+// TBD chobae : pintos syscall func add
+void check_address(void *addr)	{
+	/*  포인터가 가리키는 주소가 유저영역의 주소인지 확인
+		잘못된 접근일 경우 프로세스 종료
+		유효한 주소 (0x8048000 ~ 0x0000000)인지 확인
+	*/
+}
+
+void get_argument(void *rsp, int *arg, int count) {
+	/* 유저 스택에 저장된 인자값들을 커널로 저장
+	   인자가 저장된 위치가 유저영역인지 확인
+	*/
+}
+
+// syscall func section
+// halt() -> pintos 종료
+void halt(void) {
+	// 거의 사용하지 않는게 좋음.
+	power_off();
+}
+// exit() -> 실행중인 스레드? 프로세스? 종료 후 status 리턴
+void exit(int status) {
+	// TODO : 부모 스레드가 기다릴때 fork?
+	struct thread *cur = thread_current();
+	printf("%s : exit", cur->tid);
+	thread_exit();
+}
+// fork() ->  💩💩왕중요💩💩
+// pid_t fork (const char *thread_name) {
+// 	thread_name = thread_current();
+
+// }
+// exec() -> 파일 실행
+int exec (const char *cmd_line)	{
+	// TODO: exec 이 호출되는 동안 파일 디스크립터들이 계속 열려있는 상태를 유지하도록 주의
+	process_exec(cmd_line);
+}
+// wait() -> 자식 스레드가 일을 마칠때까지 기다림  💩💩왕중요💩💩
+// int wait (pid_t pid) {
+	
+// }
+
+// create() -> 파일 이름과 크기에 해당하는 파일 생성
+bool create(const char *file, unsigned initial_size) {
+	return filesys_create(file, initial_size);
+}
+// remove() -> 파일 이에 해당하는 파일 제거
+bool remove(const char *file) {
+	return filesys_remove(file);
+}
+// open() -> 파일 열기
+int open (const char *file) {
+	return filesys_open(file);
+}
+// filesize() -> fd가 가리키는 열려있는 파일의 사이즈를 리턴
+int filesize (int fd) {
+	return file_length(fd);
+}
+// read() -> fd가 가르키는 file에서 size 바이트만큼 buffer로 읽음.
+int read (int fd, void *buffer, unsigned size) {
+	return file_read(fd, buffer, size);
+}
+// write() -> buffer의 내용을 size 바이트만큼 fd에 write
+int write (int fd, const void *buffer, unsigned size) {
+	return file_write(fd, buffer, size);
+}
+// seek() -> 처음부터 센 것을 기준으로, 다음에 읽거나 쓸 바이트를 position으로 변경
+void seek (int fd, unsigned position) {
+	return file_seek(fd, position);
+}
+// tell() -> 일의 처음부터 센 것을 기준으로, 다음에 읽을 바이트 혹은 fd에 쓸 다음 바이트의 포지션을 리턴
+unsigned tell (int fd) {
+	return file_tell(fd);
+}
+
+// close() -> fd가 가르키는 파일 닫기
+void close (int fd) {
+	return file_close(fd);
+}
+
