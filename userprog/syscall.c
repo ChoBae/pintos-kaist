@@ -53,78 +53,50 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// 스택 포인터가 유저 영역인지 확인
 	check_address(f->rsp);
 	printf ("system call!\n");
-	// SYS_HALT,                   /* Halt the operating system. */
-	// SYS_EXIT,                   /* Terminate this process. */
-	// SYS_FORK,                   /* Clone current process. */
-	// SYS_EXEC,                   /* Switch current process. */
-	// SYS_WAIT,                   /* Wait for a child process to die. */
-	// SYS_CREATE,                 /* Create a file. */
-	// SYS_REMOVE,                 /* Delete a file. */
-	// SYS_OPEN,                   /* Open a file. */
-	// SYS_FILESIZE,               /* Obtain a file's size. */
-	// SYS_READ,                   /* Read from a file. */
-	// SYS_WRITE,                  /* Write to a file. */
-	// SYS_SEEK,                   /* Change position in a file. */
-	// SYS_TELL,                   /* Report current position in a file. */
-	// SYS_CLOSE,                  /* Close a file. */
+
 	switch (f->R.rax)
 	{
 	// 0 -> HALT() :
 	case SYS_HALT:
 		halt();
 		break;
-	case 1:
-		printf("this syscall %s \n", SYS_EXIT);
+	case SYS_EXIT:
 		exit();
 		break;
-	case 2:
-		printf("this syscall %s \n", SYS_FORK);
+	case SYS_FORK:
 		fork();
 		break;
 	case SYS_EXEC:
 		exec(f->R.rdi);
 		break;
-	case 4:
-		printf("this syscall %s \n", SYS_WAIT);
+	case SYS_WAIT:
 		wait();
 		break;
-	case 5:
-		printf("this syscall %s \n", SYS_CREATE);
+	case SYS_CREATE:
 		create();
 		break;
-	case 6:
-		printf("this syscall %s \n", SYS_REMOVE);
+	case SYS_REMOVE:
 		remove();
 		break;
-	case 7:
-		printf("this syscall %s \n", SYS_OPEN);
+	case SYS_OPEN:
 		open();
 		break;
-	case 8:
-		printf("this syscall %s \n", SYS_FILESIZE);
+	case SYS_FILESIZE:
 		filesize();
 		break;
-	case 9:
-		printf("this syscall %s \n", SYS_READ);
+	case SYS_READ:
 		read();
 		break;
-	case 10:
-		printf("this syscall %s \n", SYS_WRITE);
-		halt();
-		/* code */
+	case SYS_WRITE:
+		write();
 		break;
-	case 11:
-		printf("this syscall %s \n", SYS_SEEK);
-		halt();
-		/* code */
+	case SYS_SEEK:
+		seek();
 		break;
-	case 12:
-		printf("this syscall %s \n", SYS_TELL);
-		halt();
-		/* code */
+	case SYS_TELL:
+		tell();
 		break;
-	case 13:
-		printf("this syscall %s \n", SYS_CLOSE);
+	case SYS_CLOSE:
 		close();
 		break;
 	
