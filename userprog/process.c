@@ -166,9 +166,6 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	printf("===DEBUG f_name is... %s ====\n", f_name);
-	// f_name에 
-	
 	char *file_name = f_name;
 	bool success;
 
@@ -184,8 +181,8 @@ process_exec (void *f_name) {
 	process_cleanup ();
 
 	/* And then load the binary */
-
 	success = load (file_name, &_if);
+
 	
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -193,7 +190,7 @@ process_exec (void *f_name) {
 		return -1;
 
 	// char *buf;
-	// hex_dump(_if.rsp , buf , KERN_BASE - _if.rsp ,true);
+	hex_dump(_if.rsp , _if.rsp , USER_STACK - _if.rsp ,true);
 	// hex_dump(_if.rsp , _if.rsp , 1000 ,true);
 
 	/* Start switched process. */
@@ -201,70 +198,50 @@ process_exec (void *f_name) {
 
 	NOT_REACHED ();
 }
-void argument_stack(char **parse, int count, void **rsp) {
-	/* 프로그램 이름 및 인자(문자열) push */
-	/* 프로그램 이름 및 인자 주소들 push */
-	
-	// 0. n = count를 받아온다
+void argument_stack(char parse[30][30], int count, struct intr_frame *if_) {
+// 	/* 프로그램 이름 및 인자(문자열) push */
+// 	/* 프로그램 이름 및 인자 주소들 push */
 
-	// 1. 유저스택
-	// 2. 밑으로 자라나게 한다
-	// 3. n번째 인자를 쌓는다. 그 밑에 n-1번째 인자를 쌓는다 .... 첫번째 인자를 쌓는다
-		// n번째 인자의 주소를 저장한다. <= AAA
-		// n-1번째 인자의 주소를 저장한다. <= BBB
-		// ...
-		// 1번째 인자의 주소를 저장한다. <= CCC
-	// 4. padding을 넣어준다.
-	// 5. 마지막에 null을 넣어준다.
-	// 6. AAA를 넣어준다. BBB를 넣어준다. CCC를 넣어준다.
-	// 7. return address를 넣어준다.
-
-
-
-//🐙<This>  <is> <argument>  <we>  <want>  <to>  <acquire>  <!!!>🐙
-//   0        1       2       3      4       5       6        7  
-
-//이경우 count = 7
-
-	//1.
-	char startings[6][10];
+	int width = sizeof(char *);
+	uintptr_t startings[30];
 	for (int i = count ; i >= 0; i--){
-
-		// <!!!>를 넣어야 하는 상황
-		// 3+1, 4부터 -- 시작,    count= i = 7인 상황, j = 3, 2, 1, 0 인 상황
-
-		// j[7][3] == NULL
-		// j[7][2] == !
-		// j[7][1] == !
-		// j[7][0] == ! <- 까지 완료 후, 이 주소를 저장해야 함
-		for (int j = (strlen(parse[i])); j >= 0; j--){
-			*rsp = *rsp - 1;
-			**(char **)rsp = parse[i][j];
-		}
-		// startings[7] <----- j[7][0]을 하고난직후의 rsp주소를 넣어줌
-		// 3.
-		strlcpy(startings[count], rsp, sizeof(startings[count]));
+		if_->rsp = if_->rsp - strlen(parse[i]) - 1;
+		strlcpy(if_->rsp, parse[i], strlen(parse[i])+1);
+		startings[i] = if_->rsp;
 	}
 	//4.
-	int diff = USER_STACK - (int)rsp;
-	uint8_t word_align = (((diff) + (8 - 1)) & ~0x7);
-	*rsp = *rsp - word_align;
-	*(char *)rsp = 0;
+	int diff = USER_STACK - if_->rsp;
+	uint8_t word_align = 0;
+
+	for (int i = 0; i < width; ++i) {
+		if ((diff + i) % width == 0) {
+			word_align = i;
+			break;
+		}
+	}
+
+	if_->rsp = if_->rsp -  word_align;
+	*(char *)(if_->rsp) = 0;
 
 	//5.
-	*rsp = *rsp - sizeof(char *);
-	*(char *)rsp = 0;
+	if_->rsp = if_->rsp - width;
+	*(char *)(if_->rsp) = 0;
+
 
 	//6.
-	for (int i = count ; i >= 0; i--){ 	//i = 7,6,5,4,3,2,1,0
-	// startings[7] <----- j[7][0]을 하고난직후의 rsp주소를 다시 넣어준다.
-	*rsp = *rsp - sizeof(char *);
-	*(char *)rsp = startings[i];
+	for (int i = count; i >= 0; i--) {
+		if_->rsp = if_->rsp - width;
+		memcpy(if_->rsp, &startings[i], sizeof(uintptr_t));
 	}
 
 	//7.
-	*rsp = *rsp - sizeof(char *);
-	*(char *)rsp = 0;
+	if_->rsp = if_->rsp - width;
+	*(char *)(if_->rsp) = 0;
+
+	
+	//8.
+	if_->R.rdi = count+1;
+	if_->R.rsi = if_->rsp + width;
 }
 
 
@@ -412,7 +389,6 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Returns true if successful, false otherwise. */
 static bool
 load (const char *file_name, struct intr_frame *if_) {
-	printf("OMG!!! we came into Load!! \n");
 	struct thread *t = thread_current ();
 	struct ELF ehdr;
 	struct file *file = NULL;
@@ -420,11 +396,11 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	char argv[100];				  //TBD: 100 안넘지 않을까...? <- (수연) <- 수정해야함
+	strlcpy(argv, file_name, 100); //TBD: 100 안넘지 않을까...? <- (수연) <- 수정해야함
+
 	char *next_ptr;
 	char *first_file_name = strtok_r(file_name, " ", &next_ptr);	
-	char argv[100];				  //TBD: 100 안넘지 않을까...? <- (수연) <- 수정해야함
-	strlcpy(argv, next_ptr, 100); //TBD: 100 안넘지 않을까...? <- (수연) <- 수정해야함
-	
 
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
@@ -517,7 +493,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	if_->rip = ehdr.e_entry;
 
 	
-
 	// 0. (*argv로 옵션들이 다 들어온 상태)
 	// 1. 조각조각 낸다. 조각내서 parse로 만든다
 	// 2. 미리 만들어둔 stack_argument()함수로, "그" 형태를 만든다
@@ -525,12 +500,9 @@ load (const char *file_name, struct intr_frame *if_) {
 	// 4. done
 
 
-	// 0.
-	printf("next_ptr is... %s \n", argv);
-	char f_name2[30] = "cho sung bae";
 	// 1.
 	// char **parse = (char**)malloc((100000) * sizeof(char*));
-	char parse[6][10];
+	char parse[30][30];
 	char *token, *save_ptr;
 	int count =0;
 	for (token = strtok_r (argv, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr)) {
@@ -540,11 +512,12 @@ load (const char *file_name, struct intr_frame *if_) {
 		count++;
 	}
 	// 2.
-	// argument_stack(parse, count-1, &if_->rsp); /*🚨🚨🚨🚨 <= 여기서 아싸리 -1해서 보내줌 🚨🚨🚨*/
+
+	argument_stack(parse, count-1, if_); /*🚨🚨🚨🚨 <= 여기서 아싸리 -1해서 보내줌 🚨🚨🚨*/
 
 	// 3.
-	if_	->R.rdi = count -1;
-	if_->R.rsi = &argv[0];
+
+
 	// 4. done
 	success = true;
 
